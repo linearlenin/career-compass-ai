@@ -13,6 +13,17 @@ class SuggestionError(Exception):
     """Raised when the optional Gemini suggestion request fails."""
 
 
+def is_career_preparation_question(question: str) -> bool:
+    normalized = question.casefold()
+    return bool(
+        re.search(r"\b(?:prepar(?:e|ing|ation)|prep)\b", normalized)
+        and not re.search(
+            r"\b(?:find|search|looking for|current|latest)\b",
+            normalized,
+        )
+    )
+
+
 def _extract_role_request(question: str) -> tuple[str, str] | None:
     normalized = question.lower()
     fresher = re.search(
@@ -24,7 +35,12 @@ def _extract_role_request(question: str) -> tuple[str, str] | None:
             r"\b(?:prepar(?:e|ing|ation)|prep)\b",
             normalized[:fresher.start()],
         )
-        if preparation_intent:
+        leading_search_intent = re.fullmatch(
+            r"\s*(?:(?:i\s+)?(?:looking\s+for|search(?:ing)?\s+for|find\s+me|"
+            r"apply\s+for|target(?:ing)?|want|wan|need|find)\s+)?",
+            normalized[:fresher.start()],
+        )
+        if preparation_intent or leading_search_intent:
             role_text = normalized[fresher.end():]
             role_text = re.sub(r"^\s*(?:for|to|as|in)\s+", "", role_text)
         else:
@@ -142,10 +158,7 @@ def extract_job_search_request(
 ) -> tuple[str, str, str] | None:
     """Return (role, provider query, location) for an explicit job-search request."""
     normalized = re.sub(r"\bintership\b", "internship", question.lower())
-    if re.search(r"\b(?:prepar(?:e|ing|ation)|prep)\b", normalized) and not re.search(
-        r"\b(?:find|search|looking for|current|latest)\b",
-        normalized,
-    ):
+    if is_career_preparation_question(normalized):
         return None
     location_match = re.search(
         r"\b(?:in|near|around)\s+([a-z][a-z .'-]{1,45})\s*[?.!]*$",

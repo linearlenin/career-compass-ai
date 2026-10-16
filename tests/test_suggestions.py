@@ -10,6 +10,7 @@ from suggestions import (
     extract_job_search_request,
     filter_jobs_for_role,
     generate_suggestions,
+    is_career_preparation_question,
     local_career_answer,
 )
 
@@ -378,14 +379,24 @@ class SuggestionTests(unittest.TestCase):
         )
 
     def test_fresher_preparation_question_is_not_misrouted_to_job_search(self):
-        question = "I want prepare for fresher java developer role"
+        question = "I want to prepare for fresher java developer role"
 
+        self.assertTrue(is_career_preparation_question(question))
         self.assertIsNone(extract_job_search_request(question))
 
         answer = local_career_answer(question, [], location="India")
         self.assertIn("fresher **Java Developer** role", answer)
         self.assertIn("object-oriented programming", answer)
         self.assertNotIn("Prepare jobs", answer)
+
+    def test_explicit_fresher_job_search_is_not_treated_as_preparation(self):
+        question = "Find fresher Java developer jobs"
+
+        self.assertFalse(is_career_preparation_question(question))
+        self.assertEqual(
+            extract_job_search_request(question),
+            ("Java Developer", "Java Developer fresher jobs", "India"),
+        )
 
     def test_genai_fresher_request_gives_portfolio_guidance_and_live_search(self):
         answer = answer_career_question(

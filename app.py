@@ -19,6 +19,7 @@ from suggestions import (
     extract_job_search_request,
     filter_jobs_for_role,
     generate_suggestions,
+    is_career_preparation_question,
     local_career_answer,
 )
 
@@ -518,8 +519,21 @@ with right:
         chat_location = search_location
         provider_notice = ""
         provider_result_count = 0
-        requested_search = extract_job_search_request(chat_prompt, search_location)
-        if requested_search:
+        preparation_question = is_career_preparation_question(chat_prompt)
+        requested_search = (
+            None
+            if preparation_question
+            else extract_job_search_request(chat_prompt, search_location)
+        )
+        if preparation_question:
+            answer = local_career_answer(
+                question=chat_prompt,
+                jobs=chat_jobs,
+                search_query=chat_search_query,
+                location=chat_location,
+            )
+            notice = ""
+        elif requested_search:
             chat_jobs = []
             requested_role, chat_search_query, chat_location = requested_search
             st.session_state["search_query"] = chat_search_query
