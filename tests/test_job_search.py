@@ -5,6 +5,7 @@ import requests
 
 from job_search import (
     JobSearchError,
+    alternate_location_names,
     filter_jobs_for_location,
     search_google_jobs,
     search_google_jobs_with_fallback,
@@ -56,6 +57,19 @@ class GoogleJobsSearchTests(unittest.TestCase):
         matches = filter_jobs_for_location("Bengaluru", jobs)
 
         self.assertEqual([job["location"] for job in matches], ["Bangalore, Karnataka"])
+
+    def test_bangalore_search_has_bengaluru_provider_fallback(self):
+        self.assertEqual(alternate_location_names("Bangalore"), ["Bengaluru"])
+        self.assertEqual(
+            alternate_location_names("Bangalore, Karnataka, India"),
+            ["Bengaluru"],
+        )
+
+    def test_bengaluru_search_has_bangalore_provider_fallback(self):
+        self.assertEqual(alternate_location_names("Bengaluru"), ["Bangalore"])
+
+    def test_locations_without_known_aliases_have_no_fallback(self):
+        self.assertEqual(alternate_location_names("Hyderabad"), [])
 
     def test_country_search_preserves_provider_city_results(self):
         jobs = [

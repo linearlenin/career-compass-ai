@@ -41,6 +41,23 @@ def _text(value: Any, fallback: str = "") -> str:
     return value.strip() if isinstance(value, str) else fallback
 
 
+def alternate_location_names(location: str) -> list[str]:
+    """Return known alternate spellings for a specific searched city."""
+    location_parts = [
+        re.sub(r"[^a-z0-9]+", " ", part.casefold()).strip()
+        for part in location.split(",")
+    ]
+    location_parts = [
+        part for part in location_parts if part and part not in _COUNTRY_LOCATIONS
+    ]
+    target = location_parts[0] if location_parts else ""
+    aliases = next(
+        (group for group in _LOCATION_ALIASES if target in group),
+        set(),
+    )
+    return sorted(alias.title() for alias in aliases if alias != target)
+
+
 def filter_jobs_for_location(
     location: str,
     jobs: list[dict[str, Any]],

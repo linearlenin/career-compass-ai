@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 
 from job_search import (
     JobSearchError,
+    alternate_location_names,
     filter_jobs_for_location,
     search_google_jobs,
     search_google_jobs_with_fallback,
@@ -303,6 +304,18 @@ if submitted:
                 st.session_state["jobs"] = filter_jobs_for_location(
                     search_location, provider_jobs
                 )
+                if not st.session_state["jobs"]:
+                    for alternate_location in alternate_location_names(search_location):
+                        alternate_jobs = search_google_jobs(
+                            query=query,
+                            location=alternate_location,
+                            api_key=api_key,
+                        )
+                        st.session_state["jobs"] = filter_jobs_for_location(
+                            search_location, alternate_jobs
+                        )
+                        if st.session_state["jobs"]:
+                            break
                 st.session_state.pop("search_error", None)
                 st.session_state["search_query"] = query
             except JobSearchError as exc:
@@ -499,6 +512,32 @@ with right:
                         role_filter = f"{requested_role} Internship"
                     chat_jobs = filter_jobs_for_role(role_filter, chat_jobs)
                     chat_jobs = filter_jobs_for_location(chat_location, chat_jobs)
+                    if not chat_jobs:
+                        for alternate_location in alternate_location_names(chat_location):
+                            alternate_jobs, alternate_notice = (
+                                search_google_jobs_with_fallback(
+                                    query=chat_search_query,
+                                    fallback_query=fallback_query,
+                                    location=alternate_location,
+                                    api_key=api_key,
+                                )
+                            )
+                            provider_result_count += len(alternate_jobs)
+                            alternate_matches = filter_jobs_for_role(
+                                role_filter, alternate_jobs
+                            )
+                            alternate_matches = filter_jobs_for_location(
+                                chat_location, alternate_matches
+                            )
+                            if alternate_matches:
+                                chat_jobs = alternate_matches
+                                fallback_notice = (
+                                    f"No exact-city matches on the first search; "
+                                    f"also checked {alternate_location}."
+                                )
+                                if alternate_notice:
+                                    fallback_notice += f" {alternate_notice}"
+                                break
                     if provider_result_count and not chat_jobs:
                         fallback_notice = (
                             "The provider returned listings, but none matched the requested "
