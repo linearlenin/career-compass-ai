@@ -104,6 +104,7 @@ def _format_role_title(role_text: str) -> str:
     role_text = role_text.replace("\u2011", "-")
     role_text = re.sub(r"\bfront[- ]end\b", "frontend", role_text, flags=re.IGNORECASE)
     role_text = re.sub(r"\bback[- ]end\b", "backend", role_text, flags=re.IGNORECASE)
+    role_text = re.sub(r"\bfull\s+stack\b", "full-stack", role_text, flags=re.IGNORECASE)
     role_title = role_text.title()
     role_title = re.sub(r"\bSql\b", "SQL", role_title)
     role_title = re.sub(r"\bPl/Sql\b", "PL/SQL", role_title)
@@ -212,9 +213,24 @@ def extract_job_search_request(
             role = _format_role_title(role_text)
             return role, f"{role} jobs {salary_text}", requested_location
 
-    search_intent = any(
+    explicit_role_only_request = bool(
+        re.match(
+            r"^\s*(?:(?:i\s+)?(?:want|need)\s+).+\b"
+            r"(?:jobs?|roles?|positions?|internships?)\b",
+            normalized,
+        )
+    )
+    search_intent = explicit_role_only_request or any(
         term in normalized
-        for term in ("current", "latest", "job", "opening", "vacanc", "find me", "looking for")
+        for term in (
+            "current",
+            "latest",
+            "job",
+            "opening",
+            "vacanc",
+            "find me",
+            "looking for",
+        )
     )
     if not search_intent or re.match(r"^\s*(?:which|what|how|where|when)\b", normalized):
         return None

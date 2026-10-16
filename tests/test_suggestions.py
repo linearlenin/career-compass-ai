@@ -353,6 +353,20 @@ class SuggestionTests(unittest.TestCase):
             ("Python Developer", "Python Developer jobs", "Chennai"),
         )
 
+    def test_role_only_chat_request_without_experience_triggers_live_search(self):
+        self.assertEqual(
+            extract_job_search_request("I want full stack developer role"),
+            (
+                "Full-Stack Developer",
+                "Full-Stack Developer jobs",
+                "India",
+            ),
+        )
+        self.assertEqual(
+            extract_job_search_request("I want frontend roles in Chennai"),
+            ("Frontend Developer", "Frontend Developer jobs", "Chennai"),
+        )
+
     def test_genai_fresher_request_extracts_entry_level_job_search(self):
         self.assertEqual(
             extract_job_search_request("i wan gen ai dev for fresher"),
