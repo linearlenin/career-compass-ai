@@ -244,18 +244,36 @@ st.markdown('<div id="search"></div>', unsafe_allow_html=True)
 with st.form("job_search_form"):
     first_row = st.columns([1.35, 1, 1], gap="medium")
     with first_row[0]:
-        role = st.text_input("Role or keywords", placeholder="e.g. Gen AI Engineer")
+        role = st.text_input(
+            "Role or keywords",
+            placeholder="e.g. Python Developer, Java Developer, SQL Developer",
+        )
     with first_row[1]:
         company = st.text_input("Company", placeholder="Optional · e.g. Google")
     with first_row[2]:
         domain = st.text_input("Domain", placeholder="Optional · e.g. fintech")
     second_row = st.columns([1.1, 1.1, .8], gap="medium", vertical_alignment="bottom")
     with second_row[0]:
-        location = st.text_input("Location", value="India", placeholder="City, country, or remote")
+        location = st.text_input(
+            "Location",
+            value="India",
+            placeholder="e.g. Bengaluru, Delhi, Chennai, Noida",
+        )
     with second_row[1]:
         experience = st.selectbox(
             "Experience",
-            ["Any", "Internship", "Fresher", "2 years", "1-3 years", "3-5 years", "5+ years"],
+            [
+                "Any",
+                "Internship",
+                "Fresher",
+                "2 years",
+                "1-3 years",
+                "3-5 years",
+                "5+ years",
+                "6-7 years",
+                "7-10 years",
+                "10+ years",
+            ],
         )
     with second_row[2]:
         submitted = st.form_submit_button(
@@ -301,6 +319,21 @@ if submitted:
                 provider_jobs = search_google_jobs(
                     query=query, location=search_location, api_key=api_key
                 )
+                if experience == "Internship" or re.search(
+                    r"\bintern(?:ship)?\b", role, re.IGNORECASE
+                ):
+                    parsed_role = (
+                        extract_job_search_request(f"I want {role} internship")
+                        if role.strip()
+                        else None
+                    )
+                    if parsed_role:
+                        role_filter = f"{parsed_role[0]} Internship"
+                    elif role.strip():
+                        role_filter = f"{role} Internship"
+                    else:
+                        role_filter = "Internship"
+                    provider_jobs = filter_jobs_for_role(role_filter, provider_jobs)
                 st.session_state["jobs"] = filter_jobs_for_location(
                     search_location, provider_jobs
                 )

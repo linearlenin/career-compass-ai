@@ -32,8 +32,16 @@ _LOCATION_ALIASES = (
     {"bangalore", "bengaluru"},
     {"bombay", "mumbai"},
     {"calcutta", "kolkata"},
-    {"gurgaon", "gurugram"},
+    {"cochin", "kochi"},
+    {"delhi", "new delhi"},
     {"madras", "chennai"},
+    {"mangalore", "mangaluru"},
+    {"mysore", "mysuru"},
+    {"pondicherry", "puducherry"},
+    {"simla", "shimla"},
+    {"trivandrum", "thiruvananthapuram"},
+    {"vizag", "visakhapatnam"},
+    {"gurgaon", "gurugram"},
 )
 
 

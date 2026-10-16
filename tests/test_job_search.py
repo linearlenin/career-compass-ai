@@ -71,6 +71,25 @@ class GoogleJobsSearchTests(unittest.TestCase):
     def test_locations_without_known_aliases_have_no_fallback(self):
         self.assertEqual(alternate_location_names("Hyderabad"), [])
 
+    def test_common_indian_city_aliases_match_and_retry(self):
+        city_aliases = (
+            ("Delhi", "New Delhi"),
+            ("Kochi", "Cochin"),
+            ("Mangaluru", "Mangalore"),
+            ("Mysuru", "Mysore"),
+            ("Puducherry", "Pondicherry"),
+            ("Thiruvananthapuram", "Trivandrum"),
+            ("Visakhapatnam", "Vizag"),
+        )
+        for requested, provider_location in city_aliases:
+            with self.subTest(city=requested):
+                self.assertIn(provider_location, alternate_location_names(requested))
+                matches = filter_jobs_for_location(
+                    requested,
+                    [{"location": f"{provider_location}, India"}],
+                )
+                self.assertEqual(len(matches), 1)
+
     def test_country_search_preserves_provider_city_results(self):
         jobs = [
             {"location": "Chennai, Tamil Nadu"},

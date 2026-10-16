@@ -175,7 +175,7 @@ def extract_job_search_request(
             if role.casefold() != "internship":
                 query_terms.append("internship")
         else:
-            query_terms.append(experience.replace("+", "").replace(" of experience", " experience"))
+            query_terms.append(experience.replace(" of experience", " experience"))
         if salary_text:
             query_terms.append(salary_text)
         return role, f"{' '.join(query_terms)} jobs", requested_location
@@ -191,6 +191,9 @@ def extract_job_search_request(
         )
         role_text = re.sub(r"\b(?:job\s+)?role\s*$", "", role_text).strip()
         role_text = re.sub(r"^\s*(?:a|an|the)\s+", "", role_text)
+        role_text = re.sub(r"\bdevloper\b", "developer", role_text)
+        role_text = re.sub(r"\bdev\b", "developer", role_text)
+        role_text = re.sub(r"\beng\b", "engineer", role_text)
         role = _format_role_title(role_text) if role_text else "Internship"
         query_terms = [role]
         if role.casefold() != "internship":

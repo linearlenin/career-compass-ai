@@ -468,7 +468,7 @@ class SuggestionTests(unittest.TestCase):
     def test_chat_handles_java_role_with_five_plus_years_and_searches_live_jobs(self):
         self.assertEqual(
             extract_job_search_request("i want 5+ yrs java role"),
-            ("Java Developer", "Java Developer 5 years experience jobs", "India"),
+            ("Java Developer", "Java Developer 5+ years experience jobs", "India"),
         )
 
         answer = answer_career_question(
@@ -574,6 +574,53 @@ class SuggestionTests(unittest.TestCase):
             ),
         )
 
+    def test_abbreviated_developer_internship_roles_are_normalized(self):
+        role_cases = (
+            ("python dev", "Python Developer"),
+            ("java dev", "Java Developer"),
+            ("sql dev", "SQL Developer"),
+        )
+        for requested_role, expected_role in role_cases:
+            with self.subTest(role=requested_role):
+                self.assertEqual(
+                    extract_job_search_request(
+                        f"I want {requested_role} internship in Bangalore"
+                    ),
+                    (
+                        expected_role,
+                        f"{expected_role} internship jobs",
+                        "Bangalore",
+                    ),
+                )
+
+    def test_experience_ranges_and_ten_plus_are_parsed_for_search(self):
+        cases = (
+            (
+                "I want Java Developer with 6-7 years experience in Delhi",
+                "Java Developer",
+                "Java Developer 6-7 years experience jobs",
+                "Delhi",
+            ),
+            (
+                "I want 7-10 yrs exp Python Developer in Noida",
+                "Python Developer",
+                "Python Developer 7-10 years experience jobs",
+                "Noida",
+            ),
+            (
+                "I want 10+ years SQL Developer in Hyderabad",
+                "SQL Developer",
+                "SQL Developer 10+ years experience jobs",
+                "Hyderabad",
+            ),
+        )
+        for question, expected_role, expected_query, expected_location in cases:
+            with self.subTest(question=question):
+                self.assertEqual(
+                    extract_job_search_request(question),
+                    (expected_role, expected_query, expected_location),
+                )
+
     def test_salary_requirement_is_preserved_in_provider_search(self):
         self.assertEqual(
             extract_job_search_request(
@@ -669,7 +716,7 @@ class SuggestionTests(unittest.TestCase):
             extract_job_search_request("i want 4+ exp production support role"),
             (
                 "Production Support",
-                "Application Production Support Engineer 4 years experience jobs",
+                "Application Production Support Engineer 4+ years experience jobs",
                 "India",
             ),
         )
