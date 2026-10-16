@@ -1,3 +1,4 @@
+import re
 from typing import Any
 
 import requests
@@ -7,8 +8,64 @@ class JobSearchError(Exception):
     """Raised when the configured job search provider cannot return results."""
 
 
+_COUNTRY_LOCATIONS = {
+    "australia",
+    "canada",
+    "france",
+    "germany",
+    "india",
+    "ireland",
+    "japan",
+    "netherlands",
+    "new zealand",
+    "singapore",
+    "united arab emirates",
+    "united kingdom",
+    "united states",
+    "uae",
+    "uk",
+    "usa",
+    "us",
+}
+
+
 def _text(value: Any, fallback: str = "") -> str:
     return value.strip() if isinstance(value, str) else fallback
+
+
+def filter_jobs_for_location(
+    location: str,
+    jobs: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Keep results in the requested city/region when the search is more specific than a country."""
+    requested = re.sub(r"[^a-z0-9]+", " ", location.casefold()).strip()
+    if not requested or requested in _COUNTRY_LOCATIONS:
+        return jobs
+
+    # For hierarchical inputs such as "Chennai, Tamil Nadu, India", use the
+    # most specific part while allowing provider location labels to vary.
+    location_parts = [
+        re.sub(r"[^a-z0-9]+", " ", part.casefold()).strip()
+        for part in location.split(",")
+    ]
+    location_parts = [part for part in location_parts if part and part not in _COUNTRY_LOCATIONS]
+    target = location_parts[0] if location_parts else requested
+
+    if target == "remote":
+        return [
+            job
+            for job in jobs
+            if re.search(r"\b(?:remote|anywhere)\b", str(job.get("location", "")), re.IGNORECASE)
+        ]
+
+    return [
+        job
+        for job in jobs
+        if re.search(
+            rf"\b{re.escape(target)}\b",
+            re.sub(r"[^a-z0-9]+", " ", str(job.get("location", "")).casefold()),
+        )
+    ]
 
 
 def search_google_jobs(query: str, location: str, api_key: str) -> list[dict[str, Any]]:

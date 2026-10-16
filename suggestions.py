@@ -133,7 +133,7 @@ def extract_job_search_request(
     default_location: str = "India",
 ) -> tuple[str, str, str] | None:
     """Return (role, provider query, location) for an explicit job-search request."""
-    normalized = question.lower()
+    normalized = re.sub(r"\bintership\b", "internship", question.lower())
     location_match = re.search(
         r"\b(?:in|near|around)\s+([a-z][a-z .'-]{1,45})\s*[?.!]*$",
         normalized,
@@ -263,13 +263,19 @@ def _matching_jobs_for_role(
     limit: int = 4,
 ) -> list[dict[str, Any]]:
     normalized_role = role.lower()
-    if normalized_role == "internship":
+    if "internship" in normalized_role or re.search(r"\bintern\b", normalized_role):
+        base_role = re.sub(r"\b(?:internship|intern)\b", "", normalized_role)
+        base_terms = set(re.findall(r"[a-z0-9+#]+", base_role))
+        base_terms -= {"developer", "engineer", "programmer", "job", "role", "with", "and", "in", "for"}
         return [
             job
             for job in jobs
             if re.search(
                 r"\bintern(?:ship)?\b",
                 str(job.get("title", "")).lower(),
+            )
+            and base_terms.issubset(
+                set(re.findall(r"[a-z0-9+#]+", str(job.get("title", "")).lower()))
             )
         ][:limit]
     if any(term in normalized_role for term in ("genai", "generative ai", "llm", "rag")):
@@ -328,6 +334,17 @@ def _matching_jobs_for_role(
     ][:limit]
 
 
+def _matching_jobs_for_search(
+    role: str,
+    jobs: list[dict[str, Any]],
+    search_query: str,
+    limit: int = 4,
+) -> list[dict[str, Any]]:
+    if re.search(r"\bintern(?:ship)?\b", search_query, re.IGNORECASE):
+        role = f"{role} Internship"
+    return _matching_jobs_for_role(role, jobs, limit)
+
+
 def filter_jobs_for_role(
     role: str,
     jobs: list[dict[str, Any]],
@@ -370,7 +387,9 @@ def local_career_answer(
 
     if _asks_for_company_names(question):
         role = _role_from_search_query(search_query)
-        company_jobs = _matching_jobs_for_role(role, jobs) if role else jobs
+        company_jobs = (
+            _matching_jobs_for_search(role, jobs, search_query) if role else jobs
+        )
         if not company_jobs:
             company_jobs = jobs
         companies: dict[str, list[str]] = {}
@@ -498,7 +517,7 @@ def local_career_answer(
     role_request = _extract_role_request(question)
     if role_request:
         target_role, experience_text = role_request
-        matching_jobs = _matching_jobs_for_role(target_role, jobs)
+        matching_jobs = _matching_jobs_for_search(target_role, jobs, search_query)
         lower_role = target_role.lower()
         if any(term in lower_role for term in ("genai", "generative ai", "llm", "rag")):
             skills = (
@@ -572,7 +591,7 @@ def local_career_answer(
     current_search = extract_job_search_request(question, location)
     if current_search:
         target_role, query, requested_location = current_search
-        matching_jobs = _matching_jobs_for_role(target_role, jobs)
+        matching_jobs = _matching_jobs_for_search(target_role, jobs, query)
         if matching_jobs:
             matching_list = "\n".join(
                 f"- **{job.get('title', target_role)}** at "

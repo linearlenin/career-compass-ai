@@ -562,6 +562,18 @@ class SuggestionTests(unittest.TestCase):
             ("Internship", "Internship jobs", "Bangalore"),
         )
 
+    def test_internship_request_with_common_typo_is_parsed_for_live_search(self):
+        self.assertEqual(
+            extract_job_search_request(
+                "i want python developer intership role in chennai"
+            ),
+            (
+                "Python Developer",
+                "Python Developer internship jobs",
+                "Chennai",
+            ),
+        )
+
     def test_salary_requirement_is_preserved_in_provider_search(self):
         self.assertEqual(
             extract_job_search_request(
@@ -603,6 +615,44 @@ class SuggestionTests(unittest.TestCase):
         )
 
         self.assertEqual([job["title"] for job in matches], ["Software Engineering Intern"])
+
+    def test_role_internship_filter_accepts_related_intern_titles(self):
+        matches = filter_jobs_for_role(
+            "Python Developer Internship",
+            [
+                {"title": "Python Developer Intern"},
+                {"title": "Python Development Internship"},
+                {"title": "Software Engineering Intern"},
+                {"title": "Python Developer"},
+            ],
+        )
+
+        self.assertEqual(
+            [job["title"] for job in matches],
+            ["Python Developer Intern", "Python Development Internship"],
+        )
+
+    def test_live_python_internship_listings_are_returned_by_career_assistant(self):
+        answer = local_career_answer(
+            question="i want python developer intership role in chennai",
+            jobs=[
+                {
+                    "title": "Python Development Internship",
+                    "company": "Chennai Python Co",
+                    "location": "Chennai, Tamil Nadu",
+                },
+                {
+                    "title": "Python Developer",
+                    "company": "Full-Time Python Co",
+                    "location": "Chennai, Tamil Nadu",
+                },
+            ],
+            search_query="Python Developer internship jobs",
+            location="Chennai",
+        )
+
+        self.assertIn("Chennai Python Co", answer)
+        self.assertNotIn("Full-Time Python Co", answer)
 
     def test_production_support_search_uses_it_specific_provider_query(self):
         self.assertEqual(

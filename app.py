@@ -5,7 +5,12 @@ from urllib.parse import quote_plus
 import streamlit as st
 from dotenv import load_dotenv
 
-from job_search import JobSearchError, search_google_jobs, search_google_jobs_with_fallback
+from job_search import (
+    JobSearchError,
+    filter_jobs_for_location,
+    search_google_jobs,
+    search_google_jobs_with_fallback,
+)
 from resume import ResumeParseError, extract_resume_text, match_score
 from suggestions import (
     SuggestionError,
@@ -291,8 +296,12 @@ if submitted:
             st.session_state.pop("jobs", None)
         else:
             try:
-                st.session_state["jobs"] = search_google_jobs(
-                    query=query, location=location, api_key=api_key
+                search_location = location.strip() or "India"
+                provider_jobs = search_google_jobs(
+                    query=query, location=search_location, api_key=api_key
+                )
+                st.session_state["jobs"] = filter_jobs_for_location(
+                    search_location, provider_jobs
                 )
                 st.session_state.pop("search_error", None)
                 st.session_state["search_query"] = query
@@ -383,7 +392,12 @@ with left:
                             for option in remaining_links:
                                 st.link_button(option["title"], option["link"])
     else:
-        if search_query:
+        if search_query and not st.session_state.get("search_error"):
+            st.info(
+                f"No job listings were found for **{search_query}** in **{search_location}**. "
+                "Try a nearby city or a broader location."
+            )
+        elif search_query:
             provider_query = re.sub(
                 r"\s+jobs?\s*$", "", search_query, flags=re.IGNORECASE
             )
@@ -457,6 +471,7 @@ with right:
         chat_search_query = search_query
         chat_location = search_location
         provider_notice = ""
+        provider_result_count = 0
         requested_search = extract_job_search_request(chat_prompt, search_location)
         if requested_search:
             chat_jobs = []
@@ -479,11 +494,15 @@ with right:
                         api_key=api_key,
                     )
                     provider_result_count = len(chat_jobs)
-                    chat_jobs = filter_jobs_for_role(requested_role, chat_jobs)
+                    role_filter = requested_role
+                    if re.search(r"\bintern(?:ship)?\b", chat_search_query, re.IGNORECASE):
+                        role_filter = f"{requested_role} Internship"
+                    chat_jobs = filter_jobs_for_role(role_filter, chat_jobs)
+                    chat_jobs = filter_jobs_for_location(chat_location, chat_jobs)
                     if provider_result_count and not chat_jobs:
                         fallback_notice = (
-                            "The provider returned listings, but none had a title matching "
-                            "the requested role. No unrelated listings are shown."
+                            "The provider returned listings, but none matched the requested "
+                            "role and location. No unrelated listings are shown."
                         )
                     provider_notice = fallback_notice
                     st.session_state["jobs"] = chat_jobs
@@ -498,12 +517,22 @@ with right:
                     "A direct Google Jobs search link is included in the response."
                 )
         if requested_search:
-            answer = local_career_answer(
-                question=chat_prompt,
-                jobs=chat_jobs,
-                search_query=chat_search_query,
-                location=chat_location,
-            )
+            if provider_result_count and not chat_jobs:
+                search_label = re.sub(
+                    r"\s+jobs?\s*$", "", chat_search_query, flags=re.IGNORECASE
+                )
+                answer = (
+                    f"The job provider returned listings, but none matched "
+                    f"**{search_label}** in **{chat_location}** "
+                    "after checking the role and location. Try a nearby city or broader role."
+                )
+            else:
+                answer = local_career_answer(
+                    question=chat_prompt,
+                    jobs=chat_jobs,
+                    search_query=chat_search_query,
+                    location=chat_location,
+                )
             notice = provider_notice
         else:
             try:

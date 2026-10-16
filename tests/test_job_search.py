@@ -5,12 +5,54 @@ import requests
 
 from job_search import (
     JobSearchError,
+    filter_jobs_for_location,
     search_google_jobs,
     search_google_jobs_with_fallback,
 )
 
 
 class GoogleJobsSearchTests(unittest.TestCase):
+    def test_specific_location_keeps_only_matching_city_results(self):
+        jobs = [
+            {"title": "Developer", "location": "Chennai, Tamil Nadu"},
+            {"title": "Developer", "location": "Bengaluru, Karnataka"},
+            {"title": "Developer", "location": "New Delhi"},
+        ]
+
+        matches = filter_jobs_for_location("Chennai", jobs)
+
+        self.assertEqual([job["location"] for job in matches], ["Chennai, Tamil Nadu"])
+
+    def test_hierarchical_location_uses_the_most_specific_part(self):
+        jobs = [
+            {"location": "Chennai, Tamil Nadu, India"},
+            {"location": "Coimbatore, Tamil Nadu, India"},
+            {"location": "Bengaluru, Karnataka, India"},
+        ]
+
+        matches = filter_jobs_for_location("Chennai, Tamil Nadu, India", jobs)
+
+        self.assertEqual([job["location"] for job in matches], ["Chennai, Tamil Nadu, India"])
+
+    def test_country_search_preserves_provider_city_results(self):
+        jobs = [
+            {"location": "Chennai, Tamil Nadu"},
+            {"location": "Bengaluru, Karnataka"},
+        ]
+
+        self.assertEqual(filter_jobs_for_location("India", jobs), jobs)
+
+    def test_remote_search_only_keeps_remote_listings(self):
+        jobs = [
+            {"location": "Remote"},
+            {"location": "Anywhere"},
+            {"location": "Chennai, Tamil Nadu"},
+        ]
+
+        matches = filter_jobs_for_location("Remote", jobs)
+
+        self.assertEqual([job["location"] for job in matches], ["Remote", "Anywhere"])
+
     @patch("job_search.requests.get")
     def test_normalizes_job_results_and_apply_links(self, get):
         response = Mock()
