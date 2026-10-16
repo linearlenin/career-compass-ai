@@ -598,6 +598,7 @@ with right:
                     f"**{search_label}** in **{chat_location}** "
                     "after checking the role and location. Try a nearby city or broader role."
                 )
+                notice = ""
             else:
                 answer = local_career_answer(
                     question=chat_prompt,
@@ -605,7 +606,7 @@ with right:
                     search_query=chat_search_query,
                     location=chat_location,
                 )
-            notice = provider_notice
+                notice = provider_notice
         else:
             try:
                 answer = answer_career_question(

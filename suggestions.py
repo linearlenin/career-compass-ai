@@ -20,14 +20,22 @@ def _extract_role_request(question: str) -> tuple[str, str] | None:
         normalized,
     )
     if fresher:
-        role_text = normalized[:fresher.start()]
-        role_text = re.sub(
-            r"^\s*(?:(?:i\s+)?(?:looking\s+for|search(?:ing)?\s+for|find\s+me|"
-            r"apply\s+for|target(?:ing)?|want|wan|need|find)\s+|"
-            r"(?:i\s+)?(?:am|work(?:ing)?\s+as)\s+)",
-            "",
-            role_text,
+        preparation_intent = re.search(
+            r"\b(?:prepar(?:e|ing|ation)|prep)\b",
+            normalized[:fresher.start()],
         )
+        if preparation_intent:
+            role_text = normalized[fresher.end():]
+            role_text = re.sub(r"^\s*(?:for|to|as|in)\s+", "", role_text)
+        else:
+            role_text = normalized[:fresher.start()]
+            role_text = re.sub(
+                r"^\s*(?:(?:i\s+)?(?:looking\s+for|search(?:ing)?\s+for|find\s+me|"
+                r"apply\s+for|target(?:ing)?|want|wan|need|find)\s+|"
+                r"(?:i\s+)?(?:am|work(?:ing)?\s+as)\s+)",
+                "",
+                role_text,
+            )
         role_text = re.sub(r"^\s*(?:a|an|the)\s+", "", role_text)
         role_text = re.sub(r"\b(?:jobs?|roles?|positions?)\s*$", "", role_text).strip()
         role_text = re.sub(r"\bdevloper\b", "developer", role_text)
@@ -134,6 +142,11 @@ def extract_job_search_request(
 ) -> tuple[str, str, str] | None:
     """Return (role, provider query, location) for an explicit job-search request."""
     normalized = re.sub(r"\bintership\b", "internship", question.lower())
+    if re.search(r"\b(?:prepar(?:e|ing|ation)|prep)\b", normalized) and not re.search(
+        r"\b(?:find|search|looking for|current|latest)\b",
+        normalized,
+    ):
+        return None
     location_match = re.search(
         r"\b(?:in|near|around)\s+([a-z][a-z .'-]{1,45})\s*[?.!]*$",
         normalized,
@@ -418,6 +431,35 @@ def local_career_answer(
             "I don’t have company names in the current job results. Run the role search "
             "again to load live listings, and I can list the companies shown there."
         )
+
+    if re.search(r"\b(?:prepar(?:e|ing|ation)|prep)\b", normalized):
+        preparation_request = _extract_role_request(question)
+        if preparation_request and preparation_request[1] == "fresher / entry-level":
+            target_role = preparation_request[0]
+            if "java" in target_role.casefold():
+                preparation_steps = (
+                    "1. Review Java fundamentals, object-oriented programming, collections, "
+                    "exceptions, and basic streams.\n"
+                    "2. Practise SQL, REST API basics, Git, and unit testing.\n"
+                    "3. Build a small Java project, such as a REST API with a database, and "
+                    "be ready to explain your design and tests.\n"
+                    "4. Practise coding problems and clear explanations of your project."
+                )
+            else:
+                preparation_steps = (
+                    "1. Review the role's core programming language and fundamentals.\n"
+                    "2. Practise data structures, SQL, Git, testing, and basic API concepts "
+                    "where relevant.\n"
+                    "3. Build a small project using the target role's tools and be ready to "
+                    "explain your design and tests.\n"
+                    "4. Practise coding problems and concise project explanations."
+                )
+            return (
+                f"To prepare for a fresher **{target_role}** role:\n"
+                f"{preparation_steps}\n"
+                "Use entry-level job descriptions to prioritise topics; I don't have a "
+                "specific vacancy from this preparation question."
+            )
 
     is_snowflake_request = "snowflake" in normalized
     if is_snowflake_request:

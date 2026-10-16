@@ -377,6 +377,16 @@ class SuggestionTests(unittest.TestCase):
             ("GenAI Developer", "GenAI Developer fresher jobs", "India"),
         )
 
+    def test_fresher_preparation_question_is_not_misrouted_to_job_search(self):
+        question = "I want prepare for fresher java developer role"
+
+        self.assertIsNone(extract_job_search_request(question))
+
+        answer = local_career_answer(question, [], location="India")
+        self.assertIn("fresher **Java Developer** role", answer)
+        self.assertIn("object-oriented programming", answer)
+        self.assertNotIn("Prepare jobs", answer)
+
     def test_genai_fresher_request_gives_portfolio_guidance_and_live_search(self):
         answer = answer_career_question(
             question="i wan gen ai dev for fresher",
