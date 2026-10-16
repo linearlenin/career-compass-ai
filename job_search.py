@@ -49,6 +49,33 @@ def _text(value: Any, fallback: str = "") -> str:
     return value.strip() if isinstance(value, str) else fallback
 
 
+def build_job_search_queries(
+    search_terms: list[str],
+    experience: str,
+) -> tuple[str, str]:
+    """Build an experience-focused query and a broader role query for provider retry."""
+    primary_terms = [*search_terms]
+    fallback_terms = [*search_terms]
+
+    if experience in ("Internship", "Fresher"):
+        primary_terms.append(experience.lower())
+        fallback_terms.append(experience.lower())
+    elif experience != "Any":
+        experience_match = re.fullmatch(
+            r"\s*(\d+)\s*(\+)?\s*(?:[-–]\s*(\d+)\s*)?years?\s*",
+            experience,
+            re.IGNORECASE,
+        )
+        if experience_match:
+            start, plus, end = experience_match.groups()
+            range_text = f"{start}-{end}" if end else f"{start}{plus or ''}"
+            primary_terms.append(f"{range_text} years experience")
+        else:
+            primary_terms.append(experience)
+
+    return " ".join(primary_terms), " ".join(fallback_terms)
+
+
 def alternate_location_names(location: str) -> list[str]:
     """Return known alternate spellings for a specific searched city."""
     location_parts = [

@@ -8,8 +8,8 @@ from dotenv import load_dotenv
 from job_search import (
     JobSearchError,
     alternate_location_names,
+    build_job_search_queries,
     filter_jobs_for_location,
-    search_google_jobs,
     search_google_jobs_with_fallback,
 )
 from resume import ResumeParseError, extract_resume_text, match_score
@@ -272,6 +272,7 @@ with st.form("job_search_form"):
                 "3-5 years",
                 "5+ years",
                 "6-7 years",
+                "7-8 years",
                 "7-10 years",
                 "10+ years",
             ],
@@ -302,11 +303,11 @@ if submitted:
         st.session_state.pop("jobs", None)
         st.session_state.pop("search_query", None)
     else:
-        query = " ".join(terms)
-        if experience != "Any":
-            query = f"{query} {experience}"
+        query, fallback_query = build_job_search_queries(terms, experience)
         st.session_state["search_query"] = query
         st.session_state["search_location"] = location.strip() or "India"
+        st.session_state.pop("search_notice", None)
+        st.session_state.pop("search_error", None)
         api_key = get_secret("SERPAPI_API_KEY")
         if not api_key:
             st.session_state["search_error"] = (
@@ -317,9 +318,14 @@ if submitted:
         else:
             try:
                 search_location = location.strip() or "India"
-                provider_jobs = search_google_jobs(
-                    query=query, location=search_location, api_key=api_key
+                provider_jobs, search_notice = search_google_jobs_with_fallback(
+                    query=query,
+                    fallback_query=fallback_query,
+                    location=search_location,
+                    api_key=api_key,
                 )
+                if search_notice:
+                    st.session_state["search_notice"] = search_notice
                 if experience == "Internship" or re.search(
                     r"\bintern(?:ship)?\b", role, re.IGNORECASE
                 ):
@@ -340,11 +346,16 @@ if submitted:
                 )
                 if not st.session_state["jobs"]:
                     for alternate_location in alternate_location_names(search_location):
-                        alternate_jobs = search_google_jobs(
-                            query=query,
-                            location=alternate_location,
-                            api_key=api_key,
+                        alternate_jobs, alternate_notice = (
+                            search_google_jobs_with_fallback(
+                                query=query,
+                                fallback_query=fallback_query,
+                                location=alternate_location,
+                                api_key=api_key,
+                            )
                         )
+                        if alternate_notice:
+                            st.session_state["search_notice"] = alternate_notice
                         st.session_state["jobs"] = filter_jobs_for_location(
                             search_location, alternate_jobs
                         )
@@ -365,6 +376,8 @@ if st.session_state.get("search_error"):
             "network, or provider. Google Jobs is also available through the link below."
         )
     st.warning(st.session_state["search_error"])
+if st.session_state.get("search_notice"):
+    st.info(st.session_state["search_notice"])
 
 jobs = st.session_state.get("jobs", [])
 resume_text = ""

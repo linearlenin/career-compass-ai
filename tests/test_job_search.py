@@ -6,6 +6,7 @@ import requests
 from job_search import (
     JobSearchError,
     alternate_location_names,
+    build_job_search_queries,
     filter_jobs_for_location,
     search_google_jobs,
     search_google_jobs_with_fallback,
@@ -13,6 +14,22 @@ from job_search import (
 
 
 class GoogleJobsSearchTests(unittest.TestCase):
+    def test_builds_role_and_experience_queries_for_supported_filters(self):
+        cases = (
+            ("Any", "Java Developer", "Java Developer"),
+            ("Internship", "Java Developer internship", "Java Developer internship"),
+            ("Fresher", "Java Developer fresher", "Java Developer fresher"),
+            ("6-7 years", "Java Developer 6-7 years experience", "Java Developer"),
+            ("7-8 years", "Java Developer 7-8 years experience", "Java Developer"),
+            ("10+ years", "Java Developer 10+ years experience", "Java Developer"),
+        )
+        for experience, expected_primary, expected_fallback in cases:
+            with self.subTest(experience=experience):
+                self.assertEqual(
+                    build_job_search_queries(["Java Developer"], experience),
+                    (expected_primary, expected_fallback),
+                )
+
     def test_specific_location_keeps_only_matching_city_results(self):
         jobs = [
             {"title": "Developer", "location": "Chennai, Tamil Nadu"},
@@ -190,6 +207,42 @@ class GoogleJobsSearchTests(unittest.TestCase):
         self.assertEqual(
             get.call_args_list[1].kwargs["params"]["q"],
             "Production Support jobs",
+        )
+
+    @patch("job_search.requests.get")
+    def test_senior_experience_search_retries_without_experience_after_timeout(self, get):
+        response = Mock()
+        response.json.return_value = {
+            "jobs_results": [
+                {
+                    "title": "Java Developer",
+                    "company_name": "Example Systems",
+                    "location": "Bengaluru, Karnataka",
+                }
+            ]
+        }
+        get.side_effect = [requests.Timeout(), response]
+        query, fallback_query = build_job_search_queries(
+            ["Java Developer"], "7-8 years"
+        )
+
+        jobs, notice = search_google_jobs_with_fallback(
+            query=query,
+            fallback_query=fallback_query,
+            location="Bangalore",
+            api_key="test-key",
+        )
+
+        self.assertEqual(jobs[0]["title"], "Java Developer")
+        self.assertIn("experience-specific search was unavailable", notice)
+        self.assertEqual(get.call_count, 2)
+        self.assertEqual(
+            get.call_args_list[0].kwargs["params"]["q"],
+            "Java Developer 7-8 years experience",
+        )
+        self.assertEqual(
+            get.call_args_list[1].kwargs["params"]["q"],
+            "Java Developer",
         )
 
     @patch("job_search.requests.get")
