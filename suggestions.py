@@ -392,6 +392,18 @@ def _asks_for_company_names(question: str) -> bool:
     )
 
 
+def _asks_for_skill_development(question: str) -> bool:
+    return bool(
+        re.search(
+            r"\b(?:improv\w*|build|learn|upskill\w*|strengthen\w*)\b"
+            r"|\bdevelop(?:ing)?\s+(?:(?:my|your|these|the)\s+)?skills?\b"
+            r"|\bskills?\b",
+            question,
+            re.IGNORECASE,
+        )
+    )
+
+
 def _role_from_search_query(search_query: str) -> str | None:
     normalized = search_query.lower()
     if "production support" in normalized:
@@ -485,6 +497,27 @@ def local_career_answer(
             if experience
             else "your experience level"
         )
+        if _asks_for_skill_development(question):
+            experience_label = (
+                f"With {experience_text}, prioritize the areas that are weakest in your "
+                "current projects; don't assume you need to learn everything from scratch."
+            )
+            return (
+                f"{experience_label}\n\n"
+                "1. **Performance and cost:** read Query Profiles, identify pruning and "
+                "spilling issues, and tune warehouse size and query patterns.\n"
+                "2. **Reliable ELT:** practise Streams and Tasks, Snowpipe, incremental "
+                "loads, and recovery from failed or duplicate loads.\n"
+                "3. **Data modelling and transformation:** strengthen dimensional modelling, "
+                "SCD patterns, dbt, and automated data-quality tests.\n"
+                "4. **Platform and security:** build confidence with RBAC, masking and row "
+                "access policies, secure data sharing, and environment promotion.\n"
+                "5. **Engineering practice:** use Git and CI/CD, monitoring, documentation, "
+                "and Python/Snowpark when the target roles require them.\n\n"
+                "Choose two gaps that appear repeatedly in Snowflake Developer job "
+                "descriptions, then demonstrate them in a small end-to-end project with "
+                "measured performance or reliability improvements."
+            )
         matching_jobs = [
             job
             for job in jobs
@@ -806,6 +839,9 @@ def answer_career_question(
     location: str = "India",
 ) -> str:
     if _asks_for_company_names(question):
+        return local_career_answer(question, jobs, search_query, location)
+
+    if "snowflake" in question.casefold() and _asks_for_skill_development(question):
         return local_career_answer(question, jobs, search_query, location)
 
     if not gemini_api_key:

@@ -507,7 +507,7 @@ with right:
                 "Local career guidance is active · configure Gemini for open-ended AI responses"
             )
 
-    with st.container(height=360, border=True):
+    with st.container(border=True):
         if not st.session_state["assistant_chat"]:
             st.info(
                 "Hello! Ask a question about your job search, skills, resume, or interview preparation. "

@@ -284,6 +284,23 @@ class SuggestionTests(unittest.TestCase):
         self.assertIn("Search Snowflake Developer jobs", answer)
         self.assertIn("India", answer)
 
+    @patch("suggestions.requests.post")
+    def test_snowflake_skill_advice_uses_grounded_guidance_instead_of_gemini(self, post):
+        answer = answer_career_question(
+            question="I have 4 years of experience. What skills should I improve for a Snowflake Developer role?",
+            jobs=[],
+            search_query="",
+            history=[],
+            gemini_api_key="test-key",
+        )
+
+        post.assert_not_called()
+        self.assertIn("4 years of experience", answer)
+        self.assertIn("Query Profiles", answer)
+        self.assertIn("Streams and Tasks", answer)
+        self.assertIn("dbt", answer)
+        self.assertNotIn("Drafting the Response", answer)
+
     def test_snowflake_chat_lists_matching_live_roles_when_available(self):
         answer = local_career_answer(
             question="I want a Snowflake developer role with 3 years experience",
