@@ -258,7 +258,10 @@ with st.form("job_search_form"):
 
 with st.expander("📄  Add a resume for match scores", expanded=False):
     uploaded_resume = st.file_uploader("Upload PDF or DOCX", type=["pdf", "docx"])
-    st.caption("Resume text is processed in this session. Gemini use is optional and requires your consent.")
+    st.caption(
+        "Resume text is processed in this session. Search for jobs to see a local match "
+        "score on each listing; Gemini is not required for scoring."
+    )
     if uploaded_resume is not None and get_secret("GEMINI_API_KEY"):
         use_resume_with_gemini = st.checkbox(
             "Allow Gemini to use my resume text for suggestions",
@@ -316,6 +319,12 @@ if uploaded_resume is not None:
             st.warning("No readable text was found. If this is a scanned PDF, use an OCR-enabled PDF.")
     except ResumeParseError as exc:
         st.error(str(exc))
+
+if resume_text and not jobs:
+    st.info(
+        "Your resume was read successfully. Enter a role and select **Find jobs** to "
+        "compare it with live listings and see match scores."
+    )
 
 search_query = st.session_state.get("search_query", "")
 search_location = st.session_state.get("search_location", location.strip() or "India")
