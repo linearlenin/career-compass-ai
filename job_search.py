@@ -28,6 +28,14 @@ _COUNTRY_LOCATIONS = {
     "us",
 }
 
+_LOCATION_ALIASES = (
+    {"bangalore", "bengaluru"},
+    {"bombay", "mumbai"},
+    {"calcutta", "kolkata"},
+    {"gurgaon", "gurugram"},
+    {"madras", "chennai"},
+)
+
 
 def _text(value: Any, fallback: str = "") -> str:
     return value.strip() if isinstance(value, str) else fallback
@@ -58,11 +66,16 @@ def filter_jobs_for_location(
             if re.search(r"\b(?:remote|anywhere)\b", str(job.get("location", "")), re.IGNORECASE)
         ]
 
+    aliases = next(
+        (group for group in _LOCATION_ALIASES if target in group),
+        {target},
+    )
+    location_pattern = r"\b(?:" + "|".join(re.escape(alias) for alias in aliases) + r")\b"
     return [
         job
         for job in jobs
         if re.search(
-            rf"\b{re.escape(target)}\b",
+            location_pattern,
             re.sub(r"[^a-z0-9]+", " ", str(job.get("location", "")).casefold()),
         )
     ]

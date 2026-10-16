@@ -34,6 +34,29 @@ class GoogleJobsSearchTests(unittest.TestCase):
 
         self.assertEqual([job["location"] for job in matches], ["Chennai, Tamil Nadu, India"])
 
+    def test_bangalore_search_keeps_bengaluru_provider_results(self):
+        jobs = [
+            {"title": "SQL Developer Intern", "location": "Bengaluru, Karnataka, India"},
+            {"title": "SQL Developer Intern", "location": "Hyderabad, Telangana, India"},
+        ]
+
+        matches = filter_jobs_for_location("Bangalore", jobs)
+
+        self.assertEqual(
+            [job["location"] for job in matches],
+            ["Bengaluru, Karnataka, India"],
+        )
+
+    def test_bengaluru_search_keeps_bangalore_provider_results(self):
+        jobs = [
+            {"location": "Bangalore, Karnataka"},
+            {"location": "Hyderabad, Telangana"},
+        ]
+
+        matches = filter_jobs_for_location("Bengaluru", jobs)
+
+        self.assertEqual([job["location"] for job in matches], ["Bangalore, Karnataka"])
+
     def test_country_search_preserves_provider_city_results(self):
         jobs = [
             {"location": "Chennai, Tamil Nadu"},
