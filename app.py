@@ -654,7 +654,7 @@ with right:
                 notice = provider_notice
             except SuggestionError as exc:
                 notice = (
-                    f"Gemini is temporarily unavailable; showing local career guidance. {exc}"
+                    f"AI response could not be completed; showing local career guidance. {exc}"
                 )
                 if provider_notice:
                     notice = f"{notice} {provider_notice}"

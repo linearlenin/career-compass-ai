@@ -706,6 +706,21 @@ def local_career_answer(
         )
 
     if any(term in normalized for term in ("resume", "résumé", "cv", "curriculum")):
+        if "java" in normalized or "java" in search_query.lower():
+            return (
+                "Build your Java Developer resume in this order:\n"
+                "1. **Summary:** 2–3 lines on your Java experience, strongest backend skills, "
+                "and the kind of role you want.\n"
+                "2. **Technical skills:** list only skills you can discuss, such as Core Java, "
+                "collections, Spring Boot, REST APIs, SQL, Git, and testing.\n"
+                "3. **Experience and projects:** for each item, state what you built, the "
+                "technology used, and a measurable result. Mention API, database, or "
+                "performance improvements when accurate.\n"
+                "4. **Education and links:** add relevant education, certifications, GitHub, "
+                "and a clean LinkedIn URL.\n\n"
+                "Keep it easy to scan, tailor keywords to each job description, and do not "
+                "claim tools or results you cannot explain."
+            )
         return (
             "To improve your resume for this search:\n"
             "1. Put your target role and strongest matching skills near the top.\n"
@@ -828,6 +843,23 @@ def _gemini_error(response: requests.Response, api_key: str) -> str:
     return message
 
 
+def _gemini_answer_is_incomplete(answer: str, finish_reason: str) -> bool:
+    if finish_reason == "MAX_TOKENS":
+        return True
+    stripped = answer.rstrip()
+    if not stripped or stripped.endswith((",", ";", ":")):
+        return True
+    if stripped.count("(") > stripped.count(")") or stripped.count("[") > stripped.count("]"):
+        return True
+    return bool(
+        re.search(
+            r"(?:\be\.g\.|\bi\.e\.|\band|\bor|\bwith|\bsuch as|\bincluding)$",
+            stripped,
+            re.IGNORECASE,
+        )
+    )
+
+
 def answer_career_question(
     question: str,
     jobs: list[dict[str, Any]],
@@ -858,7 +890,8 @@ def answer_career_question(
         "Answer the user's actual question directly, then give concise actionable guidance. "
         "Use only the provided current-job context for vacancy-specific claims; never invent "
         "openings, salaries, or company facts. Clearly say when data is unavailable. "
-        "Keep answers readable with short paragraphs or bullets. "
+        "Keep answers readable with short paragraphs or bullets. Return only the finished "
+        "answer; never show drafting notes, internal reasoning, or an unfinished sentence. "
         f"\nCurrent search query: {search_query or 'not set'}"
         f"\nCurrent job results:\n{job_context or 'No live job results are loaded.'}"
     )
@@ -889,7 +922,7 @@ def answer_career_question(
                     json={
                         "system_instruction": {"parts": [{"text": system_instruction}]},
                         "contents": contents,
-                        "generationConfig": {"temperature": 0.4, "maxOutputTokens": 700},
+                        "generationConfig": {"temperature": 0.4, "maxOutputTokens": 1200},
                     },
                     timeout=(8, 60),
                 )
@@ -903,12 +936,27 @@ def answer_career_question(
                     continue
                 raise SuggestionError(error)
             payload = response.json()
-            parts = payload["candidates"][0]["content"]["parts"]
+            candidate = payload["candidates"][0]
+            parts = candidate["content"]["parts"]
             answer = "\n".join(
                 part["text"] for part in parts if isinstance(part.get("text"), str)
             ).strip()
             if not answer:
                 raise SuggestionError("Gemini returned an empty answer. Please try asking another way.")
+            finish_reason = candidate.get("finishReason", "")
+            if _gemini_answer_is_incomplete(answer, finish_reason):
+                if index < len(models) - 1:
+                    continue
+                raise SuggestionError(
+                    "Gemini stopped before completing its answer. Showing complete local guidance instead."
+                )
+            if re.search(r"\bdrafting the response\b", answer, re.IGNORECASE):
+                if index < len(models) - 1:
+                    continue
+                raise SuggestionError(
+                    "Gemini returned drafting text instead of a finished answer. "
+                    "Showing complete local guidance instead."
+                )
             return answer
         raise SuggestionError(
             "Gemini models are temporarily unavailable. Please try again shortly."

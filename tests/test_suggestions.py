@@ -180,6 +180,76 @@ class SuggestionTests(unittest.TestCase):
         self.assertIn("gemini-3.5-flash", post.call_args_list[1].args[0])
 
     @patch("suggestions.requests.post")
+    def test_chat_retries_when_gemini_marks_answer_truncated(self, post):
+        truncated = Mock()
+        truncated.ok = True
+        truncated.json.return_value = {
+            "candidates": [
+                {
+                    "finishReason": "MAX_TOKENS",
+                    "content": {"parts": [{"text": "Structure: 1. Summary (e.g.,"}]},
+                }
+            ]
+        }
+        complete = Mock()
+        complete.ok = True
+        complete.json.return_value = {
+            "candidates": [
+                {
+                    "finishReason": "STOP",
+                    "content": {
+                        "parts": [{"text": "Use a concise summary and list relevant skills."}]
+                    },
+                }
+            ]
+        }
+        post.side_effect = [truncated, complete]
+
+        answer = answer_career_question(
+            question="How to build a Java developer resume?",
+            jobs=[],
+            search_query="",
+            history=[],
+            gemini_api_key="test-key",
+        )
+
+        self.assertEqual(answer, "Use a concise summary and list relevant skills.")
+        self.assertEqual(post.call_count, 2)
+
+    @patch("suggestions.requests.post")
+    def test_chat_rejects_final_incomplete_gemini_answer(self, post):
+        response = Mock()
+        response.ok = True
+        response.json.return_value = {
+            "candidates": [
+                {
+                    "finishReason": "STOP",
+                    "content": {"parts": [{"text": "Structure: 1. Summary (e.g.,"}]},
+                }
+            ]
+        }
+        post.return_value = response
+
+        with self.assertRaisesRegex(SuggestionError, "stopped before completing"):
+            answer_career_question(
+                question="How to build a Java developer resume?",
+                jobs=[],
+                search_query="",
+                history=[],
+                gemini_api_key="test-key",
+            )
+
+    def test_local_java_resume_guidance_is_complete_and_specific(self):
+        answer = local_career_answer(
+            question="How to build a Java developer resume?",
+            jobs=[],
+        )
+
+        self.assertIn("Spring Boot", answer)
+        self.assertIn("measurable result", answer)
+        self.assertTrue(answer.endswith("cannot explain."))
+
+    @patch("suggestions.requests.post")
     def test_chat_fails_over_when_primary_gemini_model_times_out(self, post):
         fallback = Mock()
         fallback.ok = True
