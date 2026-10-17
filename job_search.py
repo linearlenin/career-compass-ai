@@ -44,9 +44,80 @@ _LOCATION_ALIASES = (
     {"gurgaon", "gurugram"},
 )
 
+_INDIAN_REGION_NAMES = {
+    "andaman and nicobar islands": "Andaman and Nicobar Islands",
+    "andaman nicobar islands": "Andaman and Nicobar Islands",
+    "andhra pradesh": "Andhra Pradesh",
+    "arunachal pradesh": "Arunachal Pradesh",
+    "assam": "Assam",
+    "bihar": "Bihar",
+    "chandigarh": "Chandigarh",
+    "chhattisgarh": "Chhattisgarh",
+    "dadra and nagar haveli and daman and diu": "Dadra and Nagar Haveli and Daman and Diu",
+    "delhi": "Delhi",
+    "nct of delhi": "Delhi",
+    "goa": "Goa",
+    "gujarat": "Gujarat",
+    "haryana": "Haryana",
+    "himachal pradesh": "Himachal Pradesh",
+    "jammu and kashmir": "Jammu and Kashmir",
+    "jharkhand": "Jharkhand",
+    "karnataka": "Karnataka",
+    "kerala": "Kerala",
+    "ladakh": "Ladakh",
+    "lakshadweep": "Lakshadweep",
+    "madhya pradesh": "Madhya Pradesh",
+    "maharashtra": "Maharashtra",
+    "manipur": "Manipur",
+    "meghalaya": "Meghalaya",
+    "mizoram": "Mizoram",
+    "nagaland": "Nagaland",
+    "odisha": "Odisha",
+    "orissa": "Odisha",
+    "puducherry": "Puducherry",
+    "pondicherry": "Puducherry",
+    "punjab": "Punjab",
+    "rajasthan": "Rajasthan",
+    "sikkim": "Sikkim",
+    "tamil nadu": "Tamil Nadu",
+    "tamilnadu": "Tamil Nadu",
+    "tn": "Tamil Nadu",
+    "telangana": "Telangana",
+    "tripura": "Tripura",
+    "uttar pradesh": "Uttar Pradesh",
+    "uttarakhand": "Uttarakhand",
+    "uttaranchal": "Uttarakhand",
+    "west bengal": "West Bengal",
+}
+
 
 def _text(value: Any, fallback: str = "") -> str:
     return value.strip() if isinstance(value, str) else fallback
+
+
+def normalize_search_location(location: str) -> str:
+    """Canonicalize Indian state names before sending location to SerpAPI."""
+    parts = [
+        re.sub(r"\s+district$", "", part.strip(), flags=re.IGNORECASE)
+        for part in location.split(",")
+        if part.strip()
+    ]
+    canonical_parts = []
+    has_indian_region = False
+    has_india = False
+    for part in parts:
+        key = re.sub(r"[^a-z0-9]+", " ", part.casefold()).strip()
+        if key in {"india", "bharat"}:
+            canonical_parts.append("India")
+            has_india = True
+        elif key in _INDIAN_REGION_NAMES:
+            canonical_parts.append(_INDIAN_REGION_NAMES[key])
+            has_indian_region = True
+        else:
+            canonical_parts.append(part)
+    if has_indian_region and not has_india:
+        canonical_parts.append("India")
+    return ", ".join(canonical_parts) or "India"
 
 
 def build_job_search_queries(
@@ -57,9 +128,12 @@ def build_job_search_queries(
     primary_terms = [*search_terms]
     fallback_terms = [*search_terms]
 
-    if experience in ("Internship", "Fresher"):
+    if experience == "Internship":
         primary_terms.append(experience.lower())
         fallback_terms.append(experience.lower())
+    elif experience.casefold() in ("fresher", "fresher (0 years)", "0 years"):
+        primary_terms.append("fresher")
+        fallback_terms.append("fresher")
     elif experience != "Any":
         experience_match = re.fullmatch(
             r"\s*(\d+)\s*(\+)?\s*(?:[-–]\s*(\d+)\s*)?years?\s*",
@@ -69,7 +143,8 @@ def build_job_search_queries(
         if experience_match:
             start, plus, end = experience_match.groups()
             range_text = f"{start}-{end}" if end else f"{start}{plus or ''}"
-            primary_terms.append(f"{range_text} years experience")
+            year_label = "year" if not end and int(start) == 1 and not plus else "years"
+            primary_terms.append(f"{range_text} {year_label} experience")
         else:
             primary_terms.append(experience)
 
@@ -98,6 +173,7 @@ def filter_jobs_for_location(
     jobs: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     """Keep results in the requested city/region when the search is more specific than a country."""
+    location = normalize_search_location(location)
     requested = re.sub(r"[^a-z0-9]+", " ", location.casefold()).strip()
     if not requested or requested in _COUNTRY_LOCATIONS:
         return jobs
@@ -140,7 +216,7 @@ def search_google_jobs(query: str, location: str, api_key: str) -> list[dict[str
             params={
                 "engine": "google_jobs",
                 "q": query,
-                "location": location,
+                "location": normalize_search_location(location),
                 "api_key": api_key,
             },
             timeout=(8, 25),

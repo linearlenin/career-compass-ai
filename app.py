@@ -267,7 +267,12 @@ with st.form("job_search_form"):
                 "Any",
                 "Internship",
                 "Fresher",
-                "2 years",
+                "Fresher (0 years)",
+                *[
+                    f"{years} year{'s' if years != 1 else ''}"
+                    for years in range(1, 21)
+                ],
+                "20+ years",
                 "1-3 years",
                 "3-5 years",
                 "5+ years",

@@ -8,6 +8,7 @@ from job_search import (
     alternate_location_names,
     build_job_search_queries,
     filter_jobs_for_location,
+    normalize_search_location,
     search_google_jobs,
     search_google_jobs_with_fallback,
 )
@@ -28,6 +29,141 @@ class GoogleJobsSearchTests(unittest.TestCase):
                 self.assertEqual(
                     build_job_search_queries(["Java Developer"], experience),
                     (expected_primary, expected_fallback),
+                )
+
+    def test_builds_search_queries_for_every_experience_year_from_zero_to_twenty(self):
+        for years in range(21):
+            experience = (
+                "Fresher (0 years)"
+                if years == 0
+                else f"{years} year{'s' if years != 1 else ''}"
+            )
+            with self.subTest(experience=experience):
+                query, fallback = build_job_search_queries(
+                    ["Production Support"], experience
+                )
+                if years == 0:
+                    self.assertEqual(query, "Production Support fresher")
+                else:
+                    self.assertEqual(
+                        query,
+                        f"Production Support {years} "
+                        f"{'year' if years == 1 else 'years'} experience",
+                    )
+                self.assertEqual(
+                    fallback,
+                    "Production Support fresher"
+                    if years == 0
+                    else "Production Support",
+                )
+
+    def test_normalizes_indian_state_aliases_and_adds_country(self):
+        cases = (
+            ("Tamilnadu", "Tamil Nadu, India"),
+            ("Tamil Nadu", "Tamil Nadu, India"),
+            ("Chennai, TN", "Chennai, Tamil Nadu, India"),
+            ("Coimbatore, tamilnadu", "Coimbatore, Tamil Nadu, India"),
+            ("Kanchipuram District, Tamil Nadu", "Kanchipuram, Tamil Nadu, India"),
+            ("Karnataka, India", "Karnataka, India"),
+            ("Bengaluru", "Bengaluru"),
+            ("India", "India"),
+        )
+        for location, expected in cases:
+            with self.subTest(location=location):
+                self.assertEqual(normalize_search_location(location), expected)
+
+    def test_normalizes_all_indian_states_and_union_territories(self):
+        regions = (
+            "Andhra Pradesh",
+            "Arunachal Pradesh",
+            "Assam",
+            "Bihar",
+            "Chhattisgarh",
+            "Goa",
+            "Gujarat",
+            "Haryana",
+            "Himachal Pradesh",
+            "Jharkhand",
+            "Karnataka",
+            "Kerala",
+            "Madhya Pradesh",
+            "Maharashtra",
+            "Manipur",
+            "Meghalaya",
+            "Mizoram",
+            "Nagaland",
+            "Odisha",
+            "Punjab",
+            "Rajasthan",
+            "Sikkim",
+            "Tamil Nadu",
+            "Telangana",
+            "Tripura",
+            "Uttar Pradesh",
+            "Uttarakhand",
+            "West Bengal",
+            "Andaman and Nicobar Islands",
+            "Chandigarh",
+            "Dadra and Nagar Haveli and Daman and Diu",
+            "Delhi",
+            "Jammu and Kashmir",
+            "Ladakh",
+            "Lakshadweep",
+            "Puducherry",
+        )
+        for region in regions:
+            with self.subTest(region=region):
+                self.assertEqual(
+                    normalize_search_location(region),
+                    f"{region}, India",
+                )
+
+    def test_tamilnadu_region_search_filters_canonical_provider_locations(self):
+        jobs = [
+            {"location": "Chennai, Tamil Nadu, India"},
+            {"location": "Coimbatore, Tamil Nadu, India"},
+            {"location": "Bengaluru, Karnataka, India"},
+        ]
+
+        self.assertEqual(
+            filter_jobs_for_location("Tamilnadu", jobs),
+            jobs[:2],
+        )
+
+    def test_builds_queries_for_representative_a_to_z_job_roles(self):
+        roles = (
+            "AI / Machine Learning Engineer",
+            "Backend Developer",
+            "Cloud Architect",
+            "Data Analyst",
+            "ETL Developer",
+            "Frontend Developer",
+            "Generative AI Engineer",
+            "Hadoop / Spark Developer",
+            "iOS Developer",
+            "Java Developer",
+            "Kafka Engineer",
+            "Linux Administrator",
+            "Mainframe Developer",
+            "Network Engineer",
+            "Oracle PL/SQL Developer",
+            "Production Support Engineer",
+            "QA Analyst",
+            "React Developer",
+            "Salesforce Developer",
+            "Technical Support Engineer",
+            "UI/UX Designer",
+            "VLSI Engineer",
+            "Web Developer",
+            "Xamarin Developer",
+            "Yocto Engineer",
+            "z/OS Mainframe Systems Programmer",
+        )
+        for role in roles:
+            with self.subTest(role=role):
+                self.assertEqual(
+                    build_job_search_queries([role], "5 years"),
+                    (f"{role} 5 years experience", role),
                 )
 
     def test_specific_location_keeps_only_matching_city_results(self):
@@ -152,6 +288,16 @@ class GoogleJobsSearchTests(unittest.TestCase):
         self.assertEqual(jobs[0]["apply_links"][0]["link"], "https://example.com/jobs/1")
         get.assert_called_once()
         self.assertEqual(get.call_args.kwargs["params"]["engine"], "google_jobs")
+
+    @patch("job_search.requests.get")
+    def test_normalizes_tamilnadu_before_sending_location_to_serpapi(self, get):
+        response = Mock()
+        response.json.return_value = {"jobs_results": []}
+        get.return_value = response
+
+        search_google_jobs("Production Support 3-5 years experience", "Tamilnadu", "test-key")
+
+        self.assertEqual(get.call_args.kwargs["params"]["location"], "Tamil Nadu, India")
 
     @patch("job_search.requests.get")
     def test_reports_invalid_api_key_as_provider_error(self, get):
